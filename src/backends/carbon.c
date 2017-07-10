@@ -25,21 +25,20 @@ static void set_blocking_mode(int sock, bool blocking)
 static int check_timeout(int sock, time_t timeout)
 {
 	struct timeval tv;
-	socklen_t valopt;
+	int valopt;
 	fd_set ss;
 	tv.tv_sec = timeout;
 	tv.tv_usec = 0;
 	FD_ZERO(&ss);
 	FD_SET(sock, &ss);
 	if (select(sock+1, NULL, &ss, NULL, &tv) > 0) {
-	   socklen_t lon = sizeof(int);
-	   getsockopt(sock, SOL_SOCKET, SO_ERROR, (void*)(&valopt), &lon);
+	   socklen_t len = sizeof(valopt);
+	   getsockopt(sock, SOL_SOCKET, SO_ERROR, (void*)(&valopt), &len);
 	   if (valopt) {
 		errno = valopt;
 		return -1;
 	   }
-	}
-	else {
+	} else {
 	   errno = ETIMEDOUT;
 	   return -1;
 	}
