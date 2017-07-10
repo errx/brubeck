@@ -23,25 +23,8 @@ static void set_blocking_mode(int sock, bool blocking)
 	}
 }
 
-static void prepare_socket(int sock)
+static void prepare_socket(int sock, int user_timeout)
 {
-	// int optval = 1;
-	// if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof optval) < 0) {
-	// 	log_splunk_errno("backend=carbon event=keep-alive error");
-	// }
-	// int keep_alive_time = 10;
-	// if (setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &keep_alive_time, sizeof keep_alive_time) < 0) {
-	// 	log_splunk_errno("backend=carbon event=keep-alive-time error");
-	// }
-	// int keep_alive_count = 2;
-	// if (setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &keep_alive_count, sizeof keep_alive_count) < 0) {
-	// 	log_splunk_errno("backend=carbon event=keep-alive-cnt error");
-	// }
-	// int keep_alive_interval = 5;
-	// if (setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &keep_alive_interval, sizeof keep_alive_interval) < 0) {
-	// 	log_splunk_errno("backend=carbon event=keep-alive-intl error");
-	// }
-	int user_timeout = 5;
 	if (setsockopt(sock, IPPROTO_TCP, TCP_USER_TIMEOUT, &user_timeout, sizeof user_timeout) < 0) {
 		log_splunk_errno("backend=carbon event=tcp-user-timeout error");
 	}
@@ -85,9 +68,9 @@ static int carbon_connect(void *backend)
 		return 0;
 
 	self->out_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	prepare_socket(self->out_sock);
 
 	if (self->out_sock >= 0) {
+		prepare_socket(self->out_sock, self->timeout);
 		set_blocking_mode(self->out_sock, false);
 		int rc = connect(self->out_sock,
 				(struct sockaddr *)&self->out_sockaddr,
