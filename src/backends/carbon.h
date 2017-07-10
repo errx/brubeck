@@ -4,6 +4,7 @@
 #define MAX_PICKLE_SIZE 256
 #define PICKLE_BUFFER_SIZE 4096
 #define PICKLE1_SIZE(key_len) (32 + key_len)
+#define CONN_TIMEOUT 5
 
 struct brubeck_carbon {
 	struct brubeck_backend backend;
@@ -16,6 +17,7 @@ struct brubeck_carbon {
 			uint16_t pt;
 	} pickler;
 	size_t sent;
+	int timeout;
 };
 
 struct brubeck_backend *brubeck_carbon_new(

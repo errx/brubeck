@@ -1,6 +1,49 @@
+#include <fcntl.h>
 #include <stddef.h>
 #include <string.h>
 #include "brubeck.h"
+
+static void set_blocking_mode(int sock, bool blocking)
+{
+	int flags = fcntl(sock, F_GETFL, 0);
+	if (flags < 0) {
+		log_splunk_errno("backend=carbon event=F_GETFL error");
+		return;
+	}
+	if (blocking) {
+		flags = flags & ~O_NONBLOCK;
+
+	} else {
+		flags = flags | O_NONBLOCK;
+	}
+	if (fcntl(sock, F_SETFL, flags) < 0) {
+		log_splunk_errno("backend=carbon event=F_SETFL error");
+		return;
+	}
+}
+
+static int check_timeout(int sock, time_t timeout)
+{
+	struct timeval tv;
+	socklen_t valopt;
+	fd_set ss;
+	tv.tv_sec = timeout;
+	tv.tv_usec = 0;
+	FD_ZERO(&ss);
+	FD_SET(sock, &ss);
+	if (select(sock+1, NULL, &ss, NULL, &tv) > 0) {
+	   socklen_t lon = sizeof(int);
+	   getsockopt(sock, SOL_SOCKET, SO_ERROR, (void*)(&valopt), &lon);
+	   if (valopt) {
+		  return -1;
+	   }
+	}
+	else {
+	   errno = ETIMEDOUT;
+	   return -1;
+	}
+	return 0;
+}
 
 static bool carbon_is_connected(void *backend)
 {
@@ -18,14 +61,23 @@ static int carbon_connect(void *backend)
 	self->out_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	if (self->out_sock >= 0) {
+		set_blocking_mode(self->out_sock, false);
 		int rc = connect(self->out_sock,
 				(struct sockaddr *)&self->out_sockaddr,
 				sizeof(self->out_sockaddr));
-		
+
 		if (rc == 0) {
 			log_splunk("backend=carbon event=connected");
 			sock_enlarge_out(self->out_sock);
 			return 0;
+		}
+		if (rc == -1 && errno == EINPROGRESS) {
+			if (check_timeout(self->out_sock, self->timeout) == 0) {
+				set_blocking_mode(self->out_sock, true);
+				log_splunk("backend=carbon event=connected (T)");
+				sock_enlarge_out(self->out_sock);
+				return 0;
+			}
 		}
 
 		close(self->out_sock);
@@ -155,7 +207,7 @@ static void pickle1_flush(void *backend)
 
 	uint32_t *buf_lead;
 	ssize_t wr;
-	
+
 	if (buf->pt == 1 || !carbon_is_connected(carbon))
 		return;
 
@@ -202,13 +254,15 @@ brubeck_carbon_new(struct brubeck_server *server, json_t *settings, int shard_n)
 	struct brubeck_carbon *carbon = xcalloc(1, sizeof(struct brubeck_carbon));
 	char *address;
 	int port, frequency, pickle = 0;
+	int timeout = CONN_TIMEOUT;
 
 	json_unpack_or_die(settings,
-		"{s:s, s:i, s?:b, s:i}",
+		"{s:s, s:i, s?:b, s:i, s?:i}",
 		"address", &address,
 		"port", &port,
 		"pickle", &pickle,
-		"frequency", &frequency);
+		"frequency", &frequency,
+		"timeout", &timeout);
 
 	carbon->backend.type = BRUBECK_BACKEND_CARBON;
 	carbon->backend.shard_n = shard_n;
@@ -226,6 +280,7 @@ brubeck_carbon_new(struct brubeck_server *server, json_t *settings, int shard_n)
 	}
 
 	carbon->backend.sample_freq = frequency;
+	carbon->timeout = timeout;
 	carbon->backend.server = server;
 	carbon->out_sock = -1;
 	url_to_inaddr2(&carbon->out_sockaddr, address, port);
