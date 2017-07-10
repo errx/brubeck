@@ -35,7 +35,8 @@ static int check_timeout(int sock, time_t timeout)
 	   socklen_t lon = sizeof(int);
 	   getsockopt(sock, SOL_SOCKET, SO_ERROR, (void*)(&valopt), &lon);
 	   if (valopt) {
-		  return -1;
+		errno = valopt;
+		return -1;
 	   }
 	}
 	else {
