@@ -19,7 +19,7 @@ struct brubeck_carbon {
 	} pickler;
 	size_t sent;
 	int timeout;
-	int user_timeout_ms;
+	unsigned int user_timeout_ms;
 };
 
 struct brubeck_backend *brubeck_carbon_new(
