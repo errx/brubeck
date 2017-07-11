@@ -31,7 +31,7 @@ static void prepare_socket(int sock, int user_timeout)
 
 }
 
-static int check_timeout(int sock, time_t timeout)
+static int check_timeout(int sock, int timeout)
 {
 	struct timeval tv;
 	int valopt;
