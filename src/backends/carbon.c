@@ -266,7 +266,8 @@ brubeck_carbon_new(struct brubeck_server *server, json_t *settings, int shard_n)
 	char *address;
 	int port, frequency, pickle = 0;
 	int timeout = CONN_TIMEOUT;
-	unsigned int user_timeout_ms = USER_TIMEOUT_MS;
+
+	json_int_t user_timeout_ms = USER_TIMEOUT_MS;
 
 	json_unpack_or_die(settings,
 		"{s:s, s:i, s?:b, s:i, s?:i, s?:i}",
@@ -294,7 +295,7 @@ brubeck_carbon_new(struct brubeck_server *server, json_t *settings, int shard_n)
 
 	carbon->backend.sample_freq = frequency;
 	carbon->timeout = timeout;
-	carbon->user_timeout_ms = user_timeout_ms;
+	carbon->user_timeout_ms = (unsigned int) user_timeout_ms;
 	carbon->backend.server = server;
 	carbon->out_sock = -1;
 	url_to_inaddr2(&carbon->out_sockaddr, address, port);
