@@ -28,6 +28,7 @@ static void prepare_socket(int sock, unsigned int user_timeout_ms)
 	log_splunk("backend=carbon set user_timeout_ms=%u", user_timeout_ms);
 	if (setsockopt(sock, IPPROTO_TCP, TCP_USER_TIMEOUT, &user_timeout_ms, sizeof user_timeout_ms) < 0) {
 		log_splunk_errno("backend=carbon event=tcp-user-timeout error");
+		die("socket error");
 	}
 
 }
