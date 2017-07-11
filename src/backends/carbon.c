@@ -23,9 +23,10 @@ static void set_blocking_mode(int sock, bool blocking)
 	}
 }
 
-static void prepare_socket(int sock, int user_timeout)
+static void prepare_socket(int sock, unsigned int user_timeout_ms)
 {
-	if (setsockopt(sock, IPPROTO_TCP, TCP_USER_TIMEOUT, &user_timeout, sizeof user_timeout) < 0) {
+	log_splunk("backend=carbon set user_timeout_ms=%u", user_timeout_ms);
+	if (setsockopt(sock, IPPROTO_TCP, TCP_USER_TIMEOUT, &user_timeout_ms, sizeof user_timeout_ms) < 0) {
 		log_splunk_errno("backend=carbon event=tcp-user-timeout error");
 	}
 
@@ -70,7 +71,7 @@ static int carbon_connect(void *backend)
 	self->out_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	if (self->out_sock >= 0) {
-		prepare_socket(self->out_sock, self->timeout);
+		prepare_socket(self->out_sock, self->user_timeout_ms);
 		set_blocking_mode(self->out_sock, false);
 		int rc = connect(self->out_sock,
 				(struct sockaddr *)&self->out_sockaddr,
@@ -265,14 +266,16 @@ brubeck_carbon_new(struct brubeck_server *server, json_t *settings, int shard_n)
 	char *address;
 	int port, frequency, pickle = 0;
 	int timeout = CONN_TIMEOUT;
+	unsigned int user_timeout_ms = USER_TIMEOUT_MS;
 
 	json_unpack_or_die(settings,
-		"{s:s, s:i, s?:b, s:i, s?:i}",
+		"{s:s, s:i, s?:b, s:i, s?:i, s?:i}",
 		"address", &address,
 		"port", &port,
 		"pickle", &pickle,
 		"frequency", &frequency,
-		"timeout", &timeout);
+		"timeout", &timeout,
+		"user_timeout_ms", &user_timeout_ms);
 
 	carbon->backend.type = BRUBECK_BACKEND_CARBON;
 	carbon->backend.shard_n = shard_n;
@@ -291,6 +294,7 @@ brubeck_carbon_new(struct brubeck_server *server, json_t *settings, int shard_n)
 
 	carbon->backend.sample_freq = frequency;
 	carbon->timeout = timeout;
+	carbon->user_timeout_ms = user_timeout_ms;
 	carbon->backend.server = server;
 	carbon->out_sock = -1;
 	url_to_inaddr2(&carbon->out_sockaddr, address, port);
