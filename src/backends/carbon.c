@@ -4,56 +4,13 @@
 #include <string.h>
 #include "brubeck.h"
 
-static void set_blocking_mode(int sock, bool blocking)
-{
-	int flags = fcntl(sock, F_GETFL, 0);
-	if (flags < 0) {
-		log_splunk_errno("backend=carbon event=F_GETFL error");
-		return;
-	}
-	if (blocking) {
-		flags = flags & ~O_NONBLOCK;
-
-	} else {
-		flags = flags | O_NONBLOCK;
-	}
-	if (fcntl(sock, F_SETFL, flags) < 0) {
-		log_splunk_errno("backend=carbon event=F_SETFL error");
-		return;
-	}
-}
-
 static void prepare_socket(int sock, unsigned int user_timeout_ms)
 {
-	log_splunk("backend=carbon set user_timeout_ms=%u", user_timeout_ms);
 	if (setsockopt(sock, IPPROTO_TCP, TCP_USER_TIMEOUT, &user_timeout_ms, sizeof user_timeout_ms) < 0) {
 		log_splunk_errno("backend=carbon event=tcp-user-timeout error");
 		die("socket error");
 	}
 
-}
-
-static int check_timeout(int sock, int timeout)
-{
-	struct timeval tv;
-	int valopt;
-	fd_set ss;
-	tv.tv_sec = timeout;
-	tv.tv_usec = 0;
-	FD_ZERO(&ss);
-	FD_SET(sock, &ss);
-	if (select(sock+1, NULL, &ss, NULL, &tv) > 0) {
-	   socklen_t len = sizeof(valopt);
-	   getsockopt(sock, SOL_SOCKET, SO_ERROR, &valopt, &len);
-	   if (valopt) {
-		errno = valopt;
-		return -1;
-	   }
-	} else {
-	   errno = ETIMEDOUT;
-	   return -1;
-	}
-	return 0;
 }
 
 static bool carbon_is_connected(void *backend)
@@ -62,18 +19,27 @@ static bool carbon_is_connected(void *backend)
 	return (self->out_sock >= 0);
 }
 
+static void carbon_disconnect(struct brubeck_carbon *self)
+{
+
+	close(self->out_sock);
+	if (errno != 0)
+		log_splunk_errno("backend=carbon event=disconnected");
+	self->out_sock = -1;
+}
+
 static int carbon_connect(void *backend)
 {
 	struct brubeck_carbon *self = (struct brubeck_carbon *)backend;
 
-	if (carbon_is_connected(self))
-		return 0;
+	if (carbon_is_connected(self)) {
+		carbon_disconnect(self);
+	}
 
 	self->out_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	if (self->out_sock >= 0) {
 		prepare_socket(self->out_sock, self->user_timeout_ms);
-		set_blocking_mode(self->out_sock, false);
 		int rc = connect(self->out_sock,
 				(struct sockaddr *)&self->out_sockaddr,
 				sizeof(self->out_sockaddr));
@@ -83,29 +49,12 @@ static int carbon_connect(void *backend)
 			sock_enlarge_out(self->out_sock);
 			return 0;
 		}
-		if (rc == -1 && errno == EINPROGRESS) {
-			if (check_timeout(self->out_sock, self->timeout) == 0) {
-				set_blocking_mode(self->out_sock, true);
-				log_splunk("backend=carbon event=connected (T)");
-				sock_enlarge_out(self->out_sock);
-				return 0;
-			}
-		}
-
 		close(self->out_sock);
 		self->out_sock = -1;
 	}
 
 	log_splunk_errno("backend=carbon event=failed_to_connect");
 	return -1;
-}
-
-static void carbon_disconnect(struct brubeck_carbon *self)
-{
-	log_splunk_errno("backend=carbon event=disconnected");
-
-	close(self->out_sock);
-	self->out_sock = -1;
 }
 
 static void plaintext_each(
