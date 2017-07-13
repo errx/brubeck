@@ -215,17 +215,15 @@ brubeck_carbon_new(struct brubeck_server *server, json_t *settings, int shard_n)
 	struct brubeck_carbon *carbon = xcalloc(1, sizeof(struct brubeck_carbon));
 	char *address;
 	int port, frequency, pickle = 0;
-	int timeout = CONN_TIMEOUT;
 
 	json_int_t user_timeout_ms = USER_TIMEOUT_MS;
 
 	json_unpack_or_die(settings,
-		"{s:s, s:i, s?:b, s:i, s?:i, s?:i}",
+		"{s:s, s:i, s?:b, s:i, s?:i}",
 		"address", &address,
 		"port", &port,
 		"pickle", &pickle,
 		"frequency", &frequency,
-		"timeout", &timeout,
 		"user_timeout_ms", &user_timeout_ms);
 
 	carbon->backend.type = BRUBECK_BACKEND_CARBON;
@@ -244,7 +242,6 @@ brubeck_carbon_new(struct brubeck_server *server, json_t *settings, int shard_n)
 	}
 
 	carbon->backend.sample_freq = frequency;
-	carbon->timeout = timeout;
 	carbon->user_timeout_ms = (unsigned int) user_timeout_ms;
 	carbon->backend.server = server;
 	carbon->out_sock = -1;
