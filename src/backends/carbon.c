@@ -1,4 +1,3 @@
-#include <fcntl.h>
 #include <netinet/tcp.h>
 #include <stddef.h>
 #include <string.h>
