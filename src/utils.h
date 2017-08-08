@@ -13,8 +13,6 @@ void sock_setreuse_port(int fd, int reuse);
 void sock_enlarge_out(int fd);
 void sock_enlarge_in(int fd);
 
-char *find_substr(const char *s, const char *find, size_t slen);
-
 int brubeck_itoa(char *ptr, uint32_t number);
 int brubeck_ftoa(char *outbuf, float f);
 
