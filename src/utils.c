@@ -12,28 +12,6 @@
 #define LARGE_SOCK_SIZE 4096
 #endif
 
-char *find_substr(const char *s, const char *find, size_t slen)
-{
-	char c, sc;
-	size_t len;
-
-	if ((c = *find++) != '\0') {
-		len = strlen(find);
-		do {
-			do {
-				if ((sc = *s++) == '\0' || slen-- < 1)
-					return NULL;
-			} while (sc != c);
-
-			if (len > slen)
-				return NULL;
-				
-		} while (strncmp(s, find, len) != 0);
-		s--;
-	}
-	return (char *)s;
-}
-
 void sock_setnonblock(int fd)
 {
 	int flags;
