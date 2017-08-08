@@ -1,7 +1,7 @@
 #include "sput.h"
 #include "brubeck.h"
 
-static void check_eq(float f, const char *str)
+static void check_eq(double f, const char *str)
 {
 	char buf[16];
 	brubeck_ftoa(buf, f);
@@ -16,6 +16,9 @@ void test_ftoa(void)
 	check_eq(15.505, "15.505");
 	check_eq(0.125, "0.125");
 	check_eq(1234.567, "1234.567");
-	check_eq(99999.999, "100000");
+	check_eq(99999.999, "99999.999");
 	check_eq(0.999, "0.999");
+	check_eq(4294967297.88, "4294967297.88");
+
+
 }
