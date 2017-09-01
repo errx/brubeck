@@ -19,7 +19,7 @@ SOURCES = \
 	src/log.c \
 	src/metric.c \
 	src/sampler.c \
-	src/samplers/statsd.c \
+	src/samplers/graphite.c \
 	src/server.c \
 	src/setproctitle.c \
 	src/slab.c \
