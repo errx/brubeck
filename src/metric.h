@@ -5,7 +5,6 @@ enum brubeck_metric_t {
 	BRUBECK_MT_GAUGE, /** g */
 	BRUBECK_MT_METER, /** c */
 	BRUBECK_MT_COUNTER, /** C */
-	BRUBECK_MT_HISTO, /** h */
 	BRUBECK_MT_TIMER, /** ms */
 	BRUBECK_MT_INTERNAL_STATS
 };
@@ -44,10 +43,6 @@ struct brubeck_metric {
 		struct {
 			value_t value;
 		} gauge, meter;
-		struct {
-			value_t value, previous;
-		} counter;
-		struct brubeck_histo histogram;
 		void *other;
 	} as;
 

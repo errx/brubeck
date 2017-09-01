@@ -77,137 +77,19 @@ static void plaintext_each(
 	carbon->sent += wr;
 }
 
-static inline size_t pickle1_int32(char *ptr, void *_src)
-{
-	*ptr = 'J';
-	memcpy(ptr + 1, _src, 4);
-	return 5;
-}
 
-static inline size_t pickle1_double(char *ptr, void *_src)
-{
-	uint8_t *source = _src;
-
-	*ptr++ = 'G';
-
-	ptr[0] = source[7];
-	ptr[1] = source[6];
-	ptr[2] = source[5];
-	ptr[3] = source[4];
-	ptr[4] = source[3];
-	ptr[5] = source[2];
-	ptr[6] = source[1];
-	ptr[7] = source[0];
-
-	return 9;
-}
-
-static void pickle1_push(
-		struct pickler *buf,
-		const char *key,
-		uint8_t key_len,
-		uint32_t timestamp,
-		value_t value)
-{
-	char *ptr = buf->ptr + buf->pos;
-
-	*ptr++ = '(';
-
-	*ptr++ = 'U';
-	*ptr++ = key_len;
-	memcpy(ptr, key, key_len);
-	ptr += key_len;
-
-	*ptr++ = 'q';
-	*ptr++ = buf->pt++;
-
-	*ptr++ = '(';
-
-	ptr += pickle1_int32(ptr, &timestamp);
-	ptr += pickle1_double(ptr, &value);
-
-	*ptr++ = 't';
-	*ptr++ = 'q';
-	*ptr++ = buf->pt++;
-
-	*ptr++ = 't';
-	*ptr++ = 'q';
-	*ptr++ = buf->pt++;
-
-	buf->pos = (ptr - buf->ptr);
-}
-
-static inline void pickle1_init(struct pickler *buf)
-{
-	static const uint8_t lead[] = { ']', 'q', 0, '(' };
-
-	memcpy(buf->ptr + 4, lead, sizeof(lead));
-	buf->pos = 4 + sizeof(lead);
-	buf->pt = 1;
-}
-
-static void pickle1_flush(void *backend)
-{
-	static const uint8_t trail[] = {'e', '.'};
-
-	struct brubeck_carbon *carbon = (struct brubeck_carbon *)backend;
-	struct pickler *buf = &carbon->pickler;
-
-	uint32_t *buf_lead;
-	ssize_t wr;
-	
-	if (buf->pt == 1 || !carbon_is_connected(carbon))
-		return;
-
-	memcpy(buf->ptr + buf->pos, trail, sizeof(trail));
-	buf->pos += sizeof(trail);
-
-	buf_lead = (uint32_t *)buf->ptr;
-	*buf_lead = htonl((uint32_t)buf->pos - 4);
-
-	wr = write_in_full(carbon->out_sock, buf->ptr, buf->pos);
-
-	pickle1_init(&carbon->pickler);
-	if (wr < 0) {
-		carbon_disconnect(carbon);
-		return;
-	}
-
-	carbon->sent += wr;
-}
-
-static void pickle1_each(
-	const char *key,
-	value_t value,
-	void *backend)
-{
-	struct brubeck_carbon *carbon = (struct brubeck_carbon *)backend;
-	uint8_t key_len = (uint8_t)strlen(key);
-
-	if (carbon->pickler.pos + PICKLE1_SIZE(key_len)
-		>= PICKLE_BUFFER_SIZE) {
-		pickle1_flush(carbon);
-	}
-
-	if (!carbon_is_connected(carbon))
-		return;
-
-	pickle1_push(&carbon->pickler, key, key_len,
-		carbon->backend.tick_time, value);
-}
 
 struct brubeck_backend *
 brubeck_carbon_new(struct brubeck_server *server, json_t *settings, int shard_n)
 {
 	struct brubeck_carbon *carbon = xcalloc(1, sizeof(struct brubeck_carbon));
 	char *address;
-	int port, frequency, pickle = 0;
+	int port, frequency;
 
 	json_unpack_or_die(settings,
 		"{s:s, s:i, s?:b, s:i}",
 		"address", &address,
 		"port", &port,
-		"pickle", &pickle,
 		"frequency", &frequency);
 
 	carbon->backend.type = BRUBECK_BACKEND_CARBON;
@@ -215,15 +97,9 @@ brubeck_carbon_new(struct brubeck_server *server, json_t *settings, int shard_n)
 	carbon->backend.connect = &carbon_connect;
 	carbon->backend.is_connected = &carbon_is_connected;
 
-	if (pickle) {
-		carbon->backend.sample = &pickle1_each;
-		carbon->backend.flush = &pickle1_flush;
-		carbon->pickler.ptr = malloc(PICKLE_BUFFER_SIZE);
-		pickle1_init(&carbon->pickler);
-	} else {
-		carbon->backend.sample = &plaintext_each;
-		carbon->backend.flush = NULL;
-	}
+
+	carbon->backend.sample = &plaintext_each;
+	carbon->backend.flush = NULL;
 
 	carbon->backend.sample_freq = frequency;
 	carbon->backend.server = server;

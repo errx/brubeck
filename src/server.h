@@ -45,7 +45,6 @@ struct brubeck_server {
 #define brubeck_stats_inc(server, STAT) brubeck_atomic_inc(&server->internal_stats.live.STAT)
 #define brubeck_stats_sample(server, STAT) (server->internal_stats.sample.STAT)
 
-void brubeck_http_endpoint_init(struct brubeck_server *server, const char *listen_on);
 
 void brubeck_internal__init(struct brubeck_server *server);
 void brubeck_internal__sample(struct brubeck_metric *metric, brubeck_sample_cb sample, void *opaque);

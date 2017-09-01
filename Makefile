@@ -13,26 +13,18 @@ all: default
 SOURCES = \
 	src/backend.c \
 	src/backends/carbon.c \
-	src/bloom.c \
 	src/city.c \
-	src/histogram.c \
 	src/ht.c \
-	src/http.c \
 	src/internal_sampler.c \
 	src/log.c \
 	src/metric.c \
 	src/sampler.c \
-	src/samplers/statsd-secure.c \
 	src/samplers/statsd.c \
 	src/server.c \
 	src/setproctitle.c \
 	src/slab.c \
 	src/utils.c
 
-ifndef BRUBECK_NO_HTTP
-	LIBS += -lmicrohttpd
-	CFLAGS += -DBRUBECK_HAVE_MICROHTTPD
-endif
 
 OBJECTS = $(patsubst %.c, %.o, $(SOURCES))
 HEADERS = $(wildcard src/*.h) $(wildcard src/libcuckoo/*.h)
